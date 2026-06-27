@@ -208,12 +208,21 @@
     .sex-strong { background: rgba(224,80,80,0.1); color: #e05050; }
 
     .movie-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.65; margin-bottom: 10px; }
-    .movie-why {
-      font-size: 13px; color: var(--amber-dim);
-      padding-top: 10px; border-top: 1px solid rgba(232,160,32,0.1);
-      line-height: 1.5;
+    .movie-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding-top: 10px; border-top: 1px solid rgba(232,160,32,0.1);
+      flex-wrap: wrap;
     }
+    .movie-why { font-size: 13px; color: var(--amber-dim); line-height: 1.5; flex: 1; }
     .movie-why::before { content: '✦ '; }
+    .justwatch-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 600; padding: 6px 12px;
+      border-radius: var(--radius-sm); text-decoration: none;
+      background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+      color: var(--text-secondary); white-space: nowrap; transition: all 0.15s; flex-shrink: 0;
+    }
+    .justwatch-btn:hover { border-color: var(--border-hover); color: var(--text-primary); background: rgba(255,255,255,0.08); }
 
     .thinking {
       display: flex; align-items: center; gap: 12px;
@@ -540,6 +549,9 @@ For sex_scenes, use exactly one of these three values:
 
     movies.forEach(m => {
       const sex = sexLabel[m.sex_scenes] || sexLabel.mild;
+      const jwSlug = m.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const jwUrl = `https://www.justwatch.com/uk/movie/${jwSlug}`;
+
       html += `
         <div class="movie-card">
           <div class="movie-top">
@@ -556,7 +568,12 @@ For sex_scenes, use exactly one of these three values:
           </div>
           <div class="movie-desc">${m.description}</div>
           <div class="sex-indicator ${sex.cls}">${sex.icon} ${sex.text}</div>
-          <div class="movie-why">${m.why}</div>
+          <div class="movie-footer">
+            <div class="movie-why">${m.why}</div>
+            <a class="justwatch-btn" href="${jwUrl}" target="_blank" rel="noopener">
+              🎬 Where to watch
+            </a>
+          </div>
         </div>`;
     });
 
