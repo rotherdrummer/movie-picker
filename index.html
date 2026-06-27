@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movie Night Picker</title>
+  <style>
+    :root {
+      --bg: #0d0d0f;
+      --bg-surface: #161618;
+      --bg-card: #1c1c1f;
+      --bg-card-hover: #222226;
+      --border: rgba(255,255,255,0.08);
+      --border-hover: rgba(255,255,255,0.16);
+      --text-primary: #f0eeea;
+      --text-secondary: #8a8885;
+      --text-muted: #555350;
+      --amber: #e8a020;
+      --amber-dim: #a06c10;
+      --amber-glow: rgba(232,160,32,0.12);
+      --amber-dark: #2a1e08;
+      --red: #e05050;
+      --green: #4caf7d;
+      --blue: #5b9bd5;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── API KEY OVERLAY ── */
+    #key-overlay {
+      position: fixed; inset: 0; background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 2rem;
+    }
+    #key-overlay.hidden { display: none; }
+    .key-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem;
+      max-width: 480px; width: 100%;
+    }
+    .key-box h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+    .key-box p { color: var(--text-secondary); font-size: 14px; margin-bottom: 1.5rem; line-height: 1.6; }
+    .key-box a { color: var(--amber); text-decoration: none; }
+    .key-box a:hover { text-decoration: underline; }
+    .key-input-row { display: flex; gap: 8px; }
+    .key-input-row input {
+      flex: 1; background: var(--bg-surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 14px;
+      color: var(--text-primary); font-size: 14px; font-family: monospace;
+      outline: none; transition: border-color 0.2s;
+    }
+    .key-input-row input:focus { border-color: var(--amber); }
+    .key-input-row input::placeholder { color: var(--text-muted); }
+    .btn-save {
+      background: var(--amber); color: #0d0d0f;
+      border: none; border-radius: var(--radius-sm);
+      padding: 10px 20px; font-weight: 600; font-size: 14px;
+      cursor: pointer; white-space: nowrap; transition: background 0.2s;
+    }
+    .btn-save:hover { background: #f0b030; }
+    .key-note {
+      font-size: 12px; color: var(--text-muted);
+      margin-top: 10px;
+    }
+
+    /* ── LAYOUT ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 17px; font-weight: 600; letter-spacing: -0.2px;
+    }
+    .logo-icon {
+      width: 32px; height: 32px; background: var(--amber);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    }
+    .logo-icon svg { width: 18px; height: 18px; }
+    .btn-key-change {
+      background: none; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 6px 14px;
+      color: var(--text-muted); font-size: 13px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-key-change:hover { border-color: var(--border-hover); color: var(--text-secondary); }
+
+    .main { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    .page-intro { margin-bottom: 2rem; }
+    .page-intro h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+    .page-intro p { color: var(--text-secondary); margin-top: 6px; font-size: 14px; }
+
+    /* ── FILTERS ── */
+    .filters { display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1.5rem; }
+    .filter-row { background: var(--bg-card); padding: 1.1rem 1.4rem; display: flex; align-items: flex-start; gap: 1.5rem; }
+    .filter-row.stacked { flex-direction: column; gap: 10px; }
+    .filter-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); white-space: nowrap; padding-top: 2px; min-width: 110px; }
+    .filter-row.stacked .filter-label { min-width: unset; padding-top: 0; }
+
+    .chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      font-size: 13px; padding: 5px 13px;
+      border-radius: 20px; border: 1px solid var(--border);
+      background: transparent; color: var(--text-secondary);
+      cursor: pointer; transition: all 0.15s; line-height: 1.4;
+    }
+    .chip:hover { border-color: var(--border-hover); color: var(--text-primary); }
+    .chip.active { background: var(--amber-dark); border-color: var(--amber-dim); color: var(--amber); font-weight: 500; }
+
+    /* range sliders */
+    .slider-wrap { flex: 1; }
+    .slider-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+    .slider-val { font-size: 13px; font-weight: 500; color: var(--amber); }
+    input[type=range] {
+      width: 100%; -webkit-appearance: none; height: 3px;
+      background: var(--border-hover); border-radius: 2px; outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 16px; height: 16px;
+      border-radius: 50%; background: var(--amber); cursor: pointer;
+      transition: transform 0.1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+    .slider-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+
+    /* mood buttons */
+    .mood-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .mood-btn {
+      display: flex; align-items: center; gap: 7px;
+      padding: 6px 14px; border-radius: 20px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--text-secondary); font-size: 13px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .mood-btn:hover { border-color: var(--border-hover); color: var(--text-primary); }
+    .mood-btn.active { background: var(--amber-dark); border-color: var(--amber-dim); color: var(--amber); }
+    .mood-icon { font-size: 15px; line-height: 1; }
+
+    /* free text */
+    .notes-input {
+      width: 100%; background: transparent; border: none;
+      color: var(--text-primary); font-size: 14px;
+      font-family: inherit; outline: none; resize: none; line-height: 1.6;
+    }
+    .notes-input::placeholder { color: var(--text-muted); }
+
+    /* ── FIND BUTTON ── */
+    .find-btn {
+      width: 100%; padding: 15px;
+      background: var(--amber); color: #0a0a0c;
+      border: none; border-radius: var(--radius-md);
+      font-size: 15px; font-weight: 700; letter-spacing: 0.2px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      gap: 8px; transition: all 0.2s;
+    }
+    .find-btn:hover { background: #f0b030; transform: translateY(-1px); }
+    .find-btn:active { transform: translateY(0); }
+    .find-btn:disabled { background: var(--bg-card); color: var(--text-muted); cursor: not-allowed; transform: none; }
+
+    /* ── RESULTS ── */
+    .results { margin-top: 2rem; }
+    .results-header {
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--text-muted);
+      padding-bottom: 1rem; margin-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .movie-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 1.25rem 1.4rem;
+      margin-bottom: 10px; transition: border-color 0.2s, background 0.2s;
+    }
+    .movie-card:hover { border-color: var(--border-hover); background: var(--bg-card-hover); }
+
+    .movie-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+    .movie-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+    .movie-meta { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+
+    .badges { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
+    .badge {
+      font-size: 11px; font-weight: 600; padding: 3px 9px;
+      border-radius: 5px; white-space: nowrap; letter-spacing: 0.3px;
+    }
+    .badge-imdb { background: rgba(232,160,32,0.15); color: var(--amber); }
+    .badge-bbfc { background: rgba(91,155,213,0.12); color: var(--blue); }
+    .badge-csm { background: rgba(76,175,125,0.12); color: var(--green); }
+    .badge-runtime { background: rgba(255,255,255,0.05); color: var(--text-secondary); }
+
+    .movie-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.65; margin-bottom: 10px; }
+    .movie-why {
+      font-size: 13px; color: var(--amber-dim);
+      padding-top: 10px; border-top: 1px solid rgba(232,160,32,0.1);
+      line-height: 1.5;
+    }
+    .movie-why::before { content: '✦ '; }
+
+    .thinking {
+      display: flex; align-items: center; gap: 12px;
+      padding: 1.25rem 1.4rem; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
+      color: var(--text-secondary); font-size: 14px;
+    }
+    .dots { display: flex; gap: 5px; }
+    .dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--amber); opacity: 0.3;
+      animation: blink 1.4s ease-in-out infinite;
+    }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%,80%,100%{opacity:0.3} 40%{opacity:1} }
+
+    .error-box {
+      padding: 1rem 1.25rem; background: rgba(224,80,80,0.08);
+      border: 1px solid rgba(224,80,80,0.2); border-radius: var(--radius-md);
+      color: var(--red); font-size: 14px;
+    }
+
+    .more-btn {
+      width: 100%; margin-top: 10px; padding: 11px;
+      background: transparent; border: 1px solid var(--border);
+      border-radius: var(--radius-md); color: var(--text-secondary);
+      font-size: 14px; cursor: pointer; transition: all 0.2s;
+    }
+    .more-btn:hover { border-color: var(--border-hover); color: var(--text-primary); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 600px) {
+      header { padding: 1rem; }
+      .main { padding: 1.5rem 1rem 3rem; }
+      .filter-row { flex-direction: column; gap: 8px; }
+      .filter-label { min-width: unset; }
+      .movie-top { flex-direction: column; }
+      .badges { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- API KEY OVERLAY -->
+<div id="key-overlay">
+  <div class="key-box">
+    <h2>🎬 Movie Night Picker</h2>
+    <p>This app uses the Claude AI API to recommend films. You'll need a free Anthropic API key — it's only stored in your browser and never sent anywhere except the Anthropic API.<br><br>
+    Get one at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys.</p>
+    <div class="key-input-row">
+      <input type="password" id="api-key-input" placeholder="sk-ant-..." autocomplete="off">
+      <button class="btn-save" onclick="saveKey()">Save</button>
+    </div>
+    <p class="key-note">Saved locally in your browser. You won't be asked again on this device.</p>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0d0d0f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="2" width="20" height="20" rx="3"/>
+        <path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 7h5M17 17h5"/>
+      </svg>
+    </div>
+    Movie Night Picker
+  </div>
+  <button class="btn-key-change" onclick="changeKey()">Change API key</button>
+</header>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="page-intro">
+    <h1>What are we watching tonight?</h1>
+    <p>Set your preferences and Claude will find five films that fit the bill.</p>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filters">
+
+    <!-- Genre -->
+    <div class="filter-row stacked">
+      <div class="filter-label">Genre</div>
+      <div class="chip-group" id="genre-group">
+        <button class="chip" data-val="Action">Action</button>
+        <button class="chip" data-val="Adventure">Adventure</button>
+        <button class="chip" data-val="Animation">Animation</button>
+        <button class="chip" data-val="Comedy">Comedy</button>
+        <button class="chip" data-val="Crime">Crime</button>
+        <button class="chip" data-val="Documentary">Documentary</button>
+        <button class="chip" data-val="Drama">Drama</button>
+        <button class="chip" data-val="Family">Family</button>
+        <button class="chip" data-val="Fantasy">Fantasy</button>
+        <button class="chip" data-val="Horror">Horror</button>
+        <button class="chip" data-val="Mystery">Mystery</button>
+        <button class="chip" data-val="Romance">Romance</button>
+        <button class="chip" data-val="Sci-Fi">Sci-Fi</button>
+        <button class="chip" data-val="Thriller">Thriller</button>
+        <button class="chip" data-val="Western">Western</button>
+      </div>
+    </div>
+
+    <!-- Era -->
+    <div class="filter-row">
+      <div class="filter-label">Era</div>
+      <div class="chip-group" id="era-group">
+        <button class="chip" data-val="1960s or 1970s">60s / 70s</button>
+        <button class="chip" data-val="1980s">80s</button>
+        <button class="chip" data-val="1990s">90s</button>
+        <button class="chip" data-val="2000s">2000s</button>
+        <button class="chip" data-val="2010s">2010s</button>
+        <button class="chip" data-val="2020s">2020s</button>
+      </div>
+    </div>
+
+    <!-- Age rating -->
+    <div class="filter-row">
+      <div class="filter-label">BBFC rating</div>
+      <div class="chip-group" id="bbfc-group">
+        <button class="chip" data-val="U">U</button>
+        <button class="chip" data-val="PG">PG</button>
+        <button class="chip" data-val="12A or 12">12 / 12A</button>
+        <button class="chip" data-val="15">15</button>
+        <button class="chip" data-val="18">18</button>
+      </div>
+    </div>
+
+    <!-- IMDb -->
+    <div class="filter-row">
+      <div class="filter-label">Min IMDb</div>
+      <div class="slider-wrap">
+        <div class="slider-header">
+          <span style="font-size:13px;color:var(--text-muted)">Only show well-rated films</span>
+          <span class="slider-val" id="imdb-val">7.0+</span>
+        </div>
+        <input type="range" id="imdb-slider" min="50" max="90" step="5" value="70" oninput="updateImdb(this.value)">
+        <div class="slider-labels"><span>5.0</span><span>6.0</span><span>7.0</span><span>8.0</span><span>9.0</span></div>
+      </div>
+    </div>
+
+    <!-- Runtime -->
+    <div class="filter-row">
+      <div class="filter-label">Max runtime</div>
+      <div class="slider-wrap">
+        <div class="slider-header">
+          <span style="font-size:13px;color:var(--text-muted)">We've got this long</span>
+          <span class="slider-val" id="runtime-val">2h 30m</span>
+        </div>
+        <input type="range" id="runtime-slider" min="60" max="210" step="15" value="150" oninput="updateRuntime(this.value)">
+        <div class="slider-labels"><span>1h</span><span>1h 45m</span><span>2h 30m</span><span>3h+</span></div>
+      </div>
+    </div>
+
+    <!-- Mood -->
+    <div class="filter-row stacked">
+      <div class="filter-label">Mood / vibe</div>
+      <div class="mood-grid" id="mood-group">
+        <button class="mood-btn" data-val="feel-good and uplifting"><span class="mood-icon">☀️</span> Feel-good</button>
+        <button class="mood-btn" data-val="edge-of-seat tense"><span class="mood-icon">💥</span> Edge-of-seat</button>
+        <button class="mood-btn" data-val="thought-provoking"><span class="mood-icon">🧠</span> Thought-provoking</button>
+        <button class="mood-btn" data-val="easy comfortable watching"><span class="mood-icon">🛋️</span> Easy watching</button>
+        <button class="mood-btn" data-val="epic and grand in scale"><span class="mood-icon">🏔️</span> Epic &amp; grand</button>
+        <button class="mood-btn" data-val="scary and frightening"><span class="mood-icon">👻</span> Scary</button>
+        <button class="mood-btn" data-val="very funny with lots of laughs"><span class="mood-icon">😂</span> Funny</button>
+        <button class="mood-btn" data-val="emotional and moving"><span class="mood-icon">🥹</span> Emotional</button>
+        <button class="mood-btn" data-val="action-packed non-stop"><span class="mood-icon">🔥</span> Non-stop action</button>
+        <button class="mood-btn" data-val="nostalgic classic feel"><span class="mood-icon">📽️</span> Nostalgic</button>
+      </div>
+    </div>
+
+    <!-- Free text -->
+    <div class="filter-row stacked">
+      <div class="filter-label">Anything else?</div>
+      <textarea class="notes-input" id="extra-notes" rows="2"
+        placeholder="e.g. we loved Top Gun and Jurassic Park — something with that energy. No subtitles. Based on a true story…"></textarea>
+    </div>
+
+  </div>
+
+  <button class="find-btn" id="find-btn" onclick="findMovies()">
+    🎬 &nbsp;Find tonight's film
+  </button>
+
+  <div class="results" id="results" style="display:none"></div>
+</main>
+
+<script>
+  // ── STATE ──
+  const selected = { genres: new Set(), eras: new Set(), bbfc: new Set(), moods: new Set() };
+  let imdbMin = 7.0, runtimeMax = 150;
+
+  // ── API KEY ──
+  function checkKey() {
+    const key = localStorage.getItem('mnp_api_key');
+    if (key) document.getElementById('key-overlay').classList.add('hidden');
+  }
+  function saveKey() {
+    const val = document.getElementById('api-key-input').value.trim();
+    if (!val.startsWith('sk-')) return alert('That doesn\'t look like a valid API key — it should start with sk-ant-…');
+    localStorage.setItem('mnp_api_key', val);
+    document.getElementById('key-overlay').classList.add('hidden');
+  }
+  function changeKey() {
+    document.getElementById('api-key-input').value = '';
+    document.getElementById('key-overlay').classList.remove('hidden');
+  }
+  checkKey();
+
+  // ── CHIP GROUPS ──
+  function initChips(groupId, stateSet) {
+    document.getElementById(groupId).querySelectorAll('.chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.classList.toggle('active');
+        if (selected[stateSet].has(btn.dataset.val)) selected[stateSet].delete(btn.dataset.val);
+        else selected[stateSet].add(btn.dataset.val);
+      });
+    });
+  }
+  initChips('genre-group', 'genres');
+  initChips('era-group', 'eras');
+  initChips('bbfc-group', 'bbfc');
+
+  document.getElementById('mood-group').querySelectorAll('.mood-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      if (selected.moods.has(btn.dataset.val)) selected.moods.delete(btn.dataset.val);
+      else selected.moods.add(btn.dataset.val);
+    });
+  });
+
+  // ── SLIDERS ──
+  function updateImdb(v) {
+    imdbMin = parseInt(v) / 10;
+    document.getElementById('imdb-val').textContent = imdbMin.toFixed(1) + '+';
+  }
+  function updateRuntime(v) {
+    runtimeMax = parseInt(v);
+    const h = Math.floor(v / 60), m = v % 60;
+    document.getElementById('runtime-val').textContent = m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+
+  // ── PROMPT BUILDER ──
+  function buildPrompt() {
+    const lines = [];
+    if (selected.genres.size) lines.push(`Genres (pick from these): ${[...selected.genres].join(', ')}`);
+    if (selected.eras.size) lines.push(`Era: ${[...selected.eras].join(' or ')}`);
+    if (selected.bbfc.size) lines.push(`BBFC certificate (UK): ${[...selected.bbfc].join(' or ')}`);
+    lines.push(`Minimum IMDb rating: ${imdbMin.toFixed(1)}`);
+    const h = Math.floor(runtimeMax / 60), m = runtimeMax % 60;
+    lines.push(`Maximum runtime: ${m > 0 ? `${h}h ${m}m` : `${h}h`}`);
+    if (selected.moods.size) lines.push(`Mood/vibe: ${[...selected.moods].join(', ')}`);
+    const notes = document.getElementById('extra-notes').value.trim();
+    if (notes) lines.push(`Extra notes from the family: ${notes}`);
+
+    return `You are a knowledgeable film expert helping a British family in South Yorkshire choose a movie to watch together tonight. They have a 13-year-old son, so family-appropriate content is important unless the age rating filters say otherwise.
+
+Here are their preferences for tonight:
+${lines.join('\n')}
+
+Recommend exactly 5 movies that genuinely fit these criteria. Choose thoughtfully — vary the picks, don't just list the five most famous films in the genre. Make them feel personally selected.
+
+Respond ONLY with a valid JSON object — no markdown, no explanation, no preamble:
+
+{
+  "movies": [
+    {
+      "title": "Film Title",
+      "year": 1993,
+      "genre": "Adventure, Sci-Fi",
+      "runtime": "2h 7m",
+      "imdb": "8.1",
+      "bbfc": "PG",
+      "csm_age": "10+",
+      "description": "Two or three sentences describing the film in plain, engaging language. No spoilers.",
+      "why": "One sentence explaining why this film fits what this family asked for tonight."
+    }
+  ]
+}
+
+For csm_age, give the Common Sense Media recommended age (e.g. '7+', '10+', '13+', '16+'). If uncertain, give your best estimate based on content.`;
+  }
+
+  // ── FIND MOVIES ──
+  async function findMovies() {
+    const key = localStorage.getItem('mnp_api_key');
+    if (!key) { changeKey(); return; }
+
+    const btn = document.getElementById('find-btn');
+    const resultsEl = document.getElementById('results');
+
+    btn.disabled = true;
+    btn.textContent = 'Finding your films…';
+    resultsEl.style.display = 'block';
+    resultsEl.innerHTML = `<div class="thinking"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><span>Picking five films for tonight…</span></div>`;
+    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2000,
+          messages: [{ role: 'user', content: buildPrompt() }]
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        if (res.status === 401) throw new Error('Invalid API key. Check it and try again.');
+        if (res.status === 429) throw new Error('Rate limit hit — wait a moment and try again.');
+        throw new Error(err.error?.message || `API error ${res.status}`);
+      }
+
+      const data = await res.json();
+      const raw = data.content.map(b => b.text || '').join('').trim();
+      const clean = raw.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
+      const parsed = JSON.parse(clean);
+
+      renderResults(parsed.movies);
+
+    } catch (err) {
+      resultsEl.innerHTML = `<div class="error-box">⚠️ ${err.message || 'Something went wrong — try again in a moment.'}</div>`;
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '🎬 &nbsp;Find tonight\'s film';
+  }
+
+  // ── RENDER ──
+  function renderResults(movies) {
+    const resultsEl = document.getElementById('results');
+    let html = `<div class="results-header">5 picks for tonight</div>`;
+
+    movies.forEach(m => {
+      html += `
+        <div class="movie-card">
+          <div class="movie-top">
+            <div>
+              <div class="movie-title">${m.title} <span style="font-weight:400;color:var(--text-muted);font-size:14px">(${m.year})</span></div>
+              <div class="movie-meta">${m.genre}</div>
+            </div>
+            <div class="badges">
+              <span class="badge badge-imdb">★ ${m.imdb}</span>
+              <span class="badge badge-bbfc">${m.bbfc}</span>
+              <span class="badge badge-csm">CSM ${m.csm_age}</span>
+              <span class="badge badge-runtime">${m.runtime}</span>
+            </div>
+          </div>
+          <div class="movie-desc">${m.description}</div>
+          <div class="movie-why">${m.why}</div>
+        </div>`;
+    });
+
+    html += `<button class="more-btn" onclick="findMovies()">↻ &nbsp;Find 5 different films</button>`;
+    resultsEl.innerHTML = html;
+  }
+
+  // allow Enter key in API key input
+  document.getElementById('api-key-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveKey(); });
+</script>
+</body>
+</html>
