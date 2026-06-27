@@ -202,6 +202,10 @@
     .badge-bbfc { background: rgba(91,155,213,0.12); color: var(--blue); }
     .badge-csm { background: rgba(76,175,125,0.12); color: var(--green); }
     .badge-runtime { background: rgba(255,255,255,0.05); color: var(--text-secondary); }
+    .sex-indicator { font-size: 13px; margin-top: 8px; padding: 6px 10px; border-radius: var(--radius-sm); display: inline-block; }
+    .sex-none { background: rgba(76,175,125,0.1); color: #4caf7d; }
+    .sex-mild { background: rgba(232,160,32,0.1); color: #e8a020; }
+    .sex-strong { background: rgba(224,80,80,0.1); color: #e05050; }
 
     .movie-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.65; margin-bottom: 10px; }
     .movie-why {
@@ -318,7 +322,6 @@
     <div class="filter-row">
       <div class="filter-label">Era</div>
       <div class="chip-group" id="era-group">
-        <button class="chip" data-val="1960s or 1970s">60s / 70s</button>
         <button class="chip" data-val="1980s">80s</button>
         <button class="chip" data-val="1990s">90s</button>
         <button class="chip" data-val="2000s">2000s</button>
@@ -365,23 +368,6 @@
       </div>
     </div>
 
-    <!-- Mood -->
-    <div class="filter-row stacked">
-      <div class="filter-label">Mood / vibe</div>
-      <div class="mood-grid" id="mood-group">
-        <button class="mood-btn" data-val="feel-good and uplifting"><span class="mood-icon">☀️</span> Feel-good</button>
-        <button class="mood-btn" data-val="edge-of-seat tense"><span class="mood-icon">💥</span> Edge-of-seat</button>
-        <button class="mood-btn" data-val="thought-provoking"><span class="mood-icon">🧠</span> Thought-provoking</button>
-        <button class="mood-btn" data-val="easy comfortable watching"><span class="mood-icon">🛋️</span> Easy watching</button>
-        <button class="mood-btn" data-val="epic and grand in scale"><span class="mood-icon">🏔️</span> Epic &amp; grand</button>
-        <button class="mood-btn" data-val="scary and frightening"><span class="mood-icon">👻</span> Scary</button>
-        <button class="mood-btn" data-val="very funny with lots of laughs"><span class="mood-icon">😂</span> Funny</button>
-        <button class="mood-btn" data-val="emotional and moving"><span class="mood-icon">🥹</span> Emotional</button>
-        <button class="mood-btn" data-val="action-packed non-stop"><span class="mood-icon">🔥</span> Non-stop action</button>
-        <button class="mood-btn" data-val="nostalgic classic feel"><span class="mood-icon">📽️</span> Nostalgic</button>
-      </div>
-    </div>
-
     <!-- Free text -->
     <div class="filter-row stacked">
       <div class="filter-label">Anything else?</div>
@@ -400,7 +386,7 @@
 
 <script>
   // ── STATE ──
-  const selected = { genres: new Set(), eras: new Set(), bbfc: new Set(), moods: new Set() };
+  const selected = { genres: new Set(), eras: new Set(), bbfc: new Set() };
   let imdbMin = 7.0, runtimeMax = 150;
 
   // ── API KEY ──
@@ -434,14 +420,6 @@
   initChips('era-group', 'eras');
   initChips('bbfc-group', 'bbfc');
 
-  document.getElementById('mood-group').querySelectorAll('.mood-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      btn.classList.toggle('active');
-      if (selected.moods.has(btn.dataset.val)) selected.moods.delete(btn.dataset.val);
-      else selected.moods.add(btn.dataset.val);
-    });
-  });
-
   // ── SLIDERS ──
   function updateImdb(v) {
     imdbMin = parseInt(v) / 10;
@@ -462,7 +440,6 @@
     lines.push(`Minimum IMDb rating: ${imdbMin.toFixed(1)}`);
     const h = Math.floor(runtimeMax / 60), m = runtimeMax % 60;
     lines.push(`Maximum runtime: ${m > 0 ? `${h}h ${m}m` : `${h}h`}`);
-    if (selected.moods.size) lines.push(`Mood/vibe: ${[...selected.moods].join(', ')}`);
     const notes = document.getElementById('extra-notes').value.trim();
     if (notes) lines.push(`Extra notes from the family: ${notes}`);
 
@@ -485,13 +462,18 @@ Respond ONLY with a valid JSON object — no markdown, no explanation, no preamb
       "imdb": "8.1",
       "bbfc": "PG",
       "csm_age": "10+",
+      "sex_scenes": "none",
       "description": "Two or three sentences describing the film in plain, engaging language. No spoilers.",
       "why": "One sentence explaining why this film fits what this family asked for tonight."
     }
   ]
 }
 
-For csm_age, give the Common Sense Media recommended age (e.g. '7+', '10+', '13+', '16+'). If uncertain, give your best estimate based on content.`;
+For csm_age, give the Common Sense Media recommended age (e.g. '7+', '10+', '13+', '16+'). If uncertain, give your best estimate based on content.
+For sex_scenes, use exactly one of these three values:
+- "none" — no sex scenes or nudity beyond incidental (e.g. brief non-sexual nudity)
+- "mild" — some sexual content or implied sex but no explicit scenes
+- "strong" — contains actual sex scenes`;
   }
 
   // ── FIND MOVIES ──
@@ -546,12 +528,18 @@ For csm_age, give the Common Sense Media recommended age (e.g. '7+', '10+', '13+
     btn.innerHTML = '🎬 &nbsp;Find tonight\'s film';
   }
 
-  // ── RENDER ──
   function renderResults(movies) {
     const resultsEl = document.getElementById('results');
     let html = `<div class="results-header">5 picks for tonight</div>`;
 
+    const sexLabel = {
+      none:   { cls: 'sex-none',   icon: '✓', text: 'No sex scenes' },
+      mild:   { cls: 'sex-mild',   icon: '⚠', text: 'Some sexual content — no explicit scenes' },
+      strong: { cls: 'sex-strong', icon: '✗', text: 'Contains sex scenes' }
+    };
+
     movies.forEach(m => {
+      const sex = sexLabel[m.sex_scenes] || sexLabel.mild;
       html += `
         <div class="movie-card">
           <div class="movie-top">
@@ -567,6 +555,7 @@ For csm_age, give the Common Sense Media recommended age (e.g. '7+', '10+', '13+
             </div>
           </div>
           <div class="movie-desc">${m.description}</div>
+          <div class="sex-indicator ${sex.cls}">${sex.icon} ${sex.text}</div>
           <div class="movie-why">${m.why}</div>
         </div>`;
     });
